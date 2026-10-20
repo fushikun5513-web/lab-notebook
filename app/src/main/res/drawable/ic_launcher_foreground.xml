@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 灰皿（浅碗）里一颗金粒 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#E2B654"
+        android:pathData="M54,38 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+    <path android:fillColor="#E6E9E4"
+        android:pathData="M32,50 L76,50 L70,70 L38,70 Z" />
+    <path android:fillColor="#1D221F"
+        android:pathData="M40,53 L68,53 Q66,60 54,60 Q42,60 40,53 Z" />
+</vector>

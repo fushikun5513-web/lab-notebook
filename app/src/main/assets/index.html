@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>化验手帐</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 布局：顶部窄标题栏 + 单列表单卡片 + 底部固定五格导航，像一本随身实验记录本 */
+:root{
+  --bg:#F1F3EF; --surface:#FFFFFF; --sunk:#E8EBE5; --ink:#1D221F; --muted:#636B65; --line:#D6DAD2;
+  --gold:#8F640C; --gold-soft:#F4E8C8; --silver:#4A5F6E; --silver-soft:#E1E8ED;
+  --ok:#2C7448; --warn:#9A6200; --warn-soft:#F7EAD2; --danger:#B0362A;
+  --font-ui: system-ui,-apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
+  --font-num: ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#141714; --surface:#1D211E; --sunk:#262B27; --ink:#E6E9E4; --muted:#9AA29C; --line:#313833;
+  --gold:#E2B654; --gold-soft:#3A3016; --silver:#A8BCC9; --silver-soft:#24303A;
+  --ok:#6CC08B; --warn:#E3A93C; --warn-soft:#3A2D12; --danger:#EF7C6E; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#141714; --surface:#1D211E; --sunk:#262B27; --ink:#E6E9E4; --muted:#9AA29C; --line:#313833;
+  --gold:#E2B654; --gold-soft:#3A3016; --silver:#A8BCC9; --silver-soft:#24303A;
+  --ok:#6CC08B; --warn:#E3A93C; --warn-soft:#3A2D12; --danger:#EF7C6E; color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:12px;padding-block:10px}
+.mark{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:600 13px/1 var(--font-num);color:var(--gold);background:var(--gold-soft);border:1.5px solid var(--gold)}
+.top h1{margin:0;font-size:17px;letter-spacing:.04em}
+.top p{margin:0;font-size:12px;color:var(--muted)}
+.top .title{flex:1;min-width:0}
+.pagehead{font-size:13px;color:var(--muted);letter-spacing:.06em}
+
+main{padding-block:14px 110px;display:flex;flex-direction:column;gap:12px}
+.panel{display:flex;flex-direction:column;gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.card h3{margin:0;font-size:14px;display:flex;align-items:center;gap:8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f>span{font-size:12px;color:var(--muted)}
+.f em{font-style:normal;font-family:var(--font-num);font-size:11px;opacity:.8}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid transparent;border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input[inputmode="decimal"]{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);background:var(--surface)}
+textarea{min-height:60px;resize:vertical}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:5px 12px;font-size:13px}
+.chip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.seg{display:flex;background:var(--sunk);border-radius:8px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;border-radius:6px;padding:6px 0;font-size:13px}
+.seg button.on{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
+
+details.more{border-top:1px dashed var(--line);padding-top:10px}
+details.more summary{font-size:13px;color:var(--muted);cursor:pointer;list-style:none}
+details.more summary::before{content:"＋ "}
+details.more[open] summary::before{content:"－ "}
+details.more[open] summary{margin-bottom:10px}
+
+.par{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
+.par:first-of-type{border-top:0;padding-top:0}
+.par-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px}
+.par-h b{letter-spacing:.05em}
+.par-r{font-family:var(--font-num);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.result{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.big.one{grid-template-columns:1fr}
+.val{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px}
+.val.au{background:var(--gold-soft)}
+.val.ag{background:var(--silver-soft)}
+.val.neutral{background:var(--sunk)}
+.val .sym{font:600 12px/1 var(--font-num);letter-spacing:.04em}
+.val.au .sym{color:var(--gold)}
+.val.ag .sym{color:var(--silver)}
+.val .n{font:600 26px/1.15 var(--font-num);font-variant-numeric:tabular-nums;word-break:break-all}
+.val .u{font-size:12px;color:var(--muted)}
+.val .sub{font-size:12px;color:var(--muted);font-family:var(--font-num)}
+.formula{font-family:var(--font-num);font-size:12px;color:var(--muted);background:var(--sunk);border-radius:8px;padding:8px 10px;overflow-x:auto;white-space:nowrap}
+.hint{font-size:13px;border-radius:8px;padding:8px 10px;background:var(--warn-soft);color:var(--warn)}
+.hint.okk{background:var(--sunk);color:var(--muted)}
+.example{font-size:12px;color:var(--warn)}
+
+.actions{display:flex;gap:10px}
+.btn{border-radius:10px;padding:12px 16px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:15px}
+.btn.primary{flex:1;background:var(--gold);border-color:var(--gold);color:var(--surface)}
+.btn.small{padding:7px 12px;font-size:13px;font-weight:500}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.danger.armed{background:var(--danger);color:var(--surface)}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.toolbar .btn{flex:1;min-width:0}
+.rec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.rec-h{display:flex;align-items:center;gap:8px;min-width:0}
+.pill{flex:none;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.pill.fa{background:var(--gold-soft);color:var(--gold)}
+.pill.inst{background:var(--silver-soft);color:var(--silver)}
+.rec-h .s{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-h .d{font-size:12px;color:var(--muted);font-family:var(--font-num)}
+.rec-v{font-family:var(--font-num);font-size:14px;font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;gap:4px 14px}
+.rec-v .au{color:var(--gold)} .rec-v .ag{color:var(--silver)}
+.rec-detail{font-size:12px;color:var(--muted);font-family:var(--font-num);white-space:pre-wrap;word-break:break-all;border-top:1px dashed var(--line);padding-top:8px}
+.rec-act{display:flex;justify-content:flex-end;gap:8px}
+.empty{text-align:center;color:var(--muted);padding:28px 10px;font-size:14px}
+.daysep{font-size:12px;color:var(--muted);font-family:var(--font-num);margin-top:4px}
+.note-preview{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:8px;padding:8px 10px}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.tabs .row{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tabs button{border:0;background:transparent;padding:8px 0 10px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--muted);border-top:2px solid transparent}
+.tabs button .ic{font:600 12px/18px var(--font-num);height:18px}
+.tabs button.on{color:var(--ink);border-top-color:var(--gold)}
+.tabs button.on .ic{color:var(--gold)}
+
+.sheet-bg{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:14px 14px 0 0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px;max-height:85%;overflow:auto}
+.sheet h3{margin:0;font-size:16px}
+.sheet p{margin:0;font-size:13px;color:var(--muted)}
+.sheet textarea{min-height:160px;font-family:var(--font-num);font-size:12px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--surface);padding:9px 16px;border-radius:999px;font-size:14px;max-width:90%;text-align:center;transition:opacity .2s}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+@media (max-width:360px){.grid3{grid-template-columns:1fr 1fr}.val .n{font-size:22px}}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="mark" aria-hidden="true">Au</div>
+    <div class="title"><h1>化验手帐</h1><p id="pageTitle">火试金品位计算</p></div>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+
+<!-- ========== 火试金 ========== -->
+<section class="panel" id="tab-fa">
+  <div class="card">
+    <div class="grid2">
+      <label class="f"><span>日期</span><input id="fa-date" type="date"></label>
+      <label class="f"><span>样品编号</span><input id="fa-sample" placeholder="如 JK-1020-01"></label>
+    </div>
+    <div class="f"><span>样品类型</span><div class="chips" id="fa-kind"></div></div>
+    <div class="grid2">
+      <label class="f"><span>补银量 <em>mg</em></span><input id="fa-agadd" inputmode="decimal"></label>
+      <div class="f"><span>平行样份数</span><div class="seg" id="fa-n"></div></div>
+    </div>
+    <details class="more" id="fa-blank-box">
+      <summary>空白扣除</summary>
+      <div class="grid2">
+        <label class="f"><span>金空白 <em>mg</em></span><input id="fa-aublank" inputmode="decimal"></label>
+        <label class="f"><span>银空白 <em>mg</em></span><input id="fa-agblank" inputmode="decimal"></label>
+      </div>
+    </details>
+  </div>
+  <div class="card" id="fa-rows"></div>
+  <div class="result" id="fa-result"></div>
+  <label class="f"><span>备注</span><textarea id="fa-note" placeholder="炉次、异常情况等"></textarea></label>
+  <div class="actions"><button class="btn" id="fa-clear">清空</button><button class="btn primary" id="fa-save">保存记录</button></div>
+</section>
+
+<!-- ========== 仪器换算 ========== -->
+<section class="panel" id="tab-inst" hidden>
+  <div class="card">
+    <div class="grid2">
+      <label class="f"><span>日期</span><input id="in-date" type="date"></label>
+      <label class="f"><span>样品编号</span><input id="in-sample" placeholder="如 CU-1020-03"></label>
+    </div>
+    <div class="f"><span>仪器</span><div class="seg" id="in-inst"></div></div>
+    <div class="f"><span>元素</span><div class="chips" id="in-el"></div>
+      <input id="in-elx" placeholder="其他元素，直接输入" style="margin-top:4px"></div>
+  </div>
+  <div class="card">
+    <div class="grid2">
+      <label class="f"><span>仪器读数</span><input id="in-c" inputmode="decimal" placeholder="0.0000"></label>
+      <label class="f"><span>空白读数</span><input id="in-c0" inputmode="decimal" placeholder="0"></label>
+    </div>
+    <div class="f"><span>读数单位</span><div class="seg" id="in-unit"></div></div>
+    <div class="grid3">
+      <label class="f"><span>称样量 <em>g</em></span><input id="in-m" inputmode="decimal"></label>
+      <label class="f"><span>定容 <em>mL</em></span><input id="in-v" inputmode="decimal"></label>
+      <label class="f"><span>稀释倍数</span><input id="in-f" inputmode="decimal"></label>
+    </div>
+  </div>
+  <div class="result" id="in-result"></div>
+  <label class="f"><span>备注</span><textarea id="in-note" placeholder="谱线、批次等"></textarea></label>
+  <div class="actions"><button class="btn" id="in-clear">清空</button><button class="btn primary" id="in-save">保存记录</button></div>
+</section>
+
+<!-- ========== 配料 ========== -->
+<section class="panel" id="tab-flux" hidden>
+  <div class="card">
+    <label class="f"><span>样品编号（可选）</span><input id="fx-sample" placeholder="如 JK-1020-01"></label>
+    <div class="grid2">
+      <label class="f"><span>称样量 <em>g</em></span><input id="fx-m" inputmode="decimal"></label>
+      <label class="f"><span>硫含量 <em>%</em>（测硫仪）</span><input id="fx-s" inputmode="decimal" placeholder="0.00"></label>
+    </div>
+    <details class="more">
+      <summary>经验系数（按本实验室试熔结果修正）</summary>
+      <div class="grid2">
+        <label class="f"><span>目标铅扣 <em>g</em></span><input id="fx-target" inputmode="decimal"></label>
+        <label class="f"><span>1 g 硫还原铅 <em>g</em></span><input id="fx-ks" inputmode="decimal"></label>
+        <label class="f"><span>1 g 硝酸钾氧化铅 <em>g</em></span><input id="fx-kno3" inputmode="decimal"></label>
+        <label class="f"><span>1 g 淀粉还原铅 <em>g</em></span><input id="fx-kst" inputmode="decimal"></label>
+        <label class="f"><span>先焙烧的硫含量 <em>%</em></span><input id="fx-roast" inputmode="decimal"></label>
+      </div>
+    </details>
+  </div>
+  <div class="result" id="fx-result"></div>
+  <label class="f"><span>备注</span><textarea id="fx-note" placeholder="熔炼情况、铅扣实际重量等"></textarea></label>
+  <div class="actions"><button class="btn" id="fx-clear">清空</button><button class="btn primary" id="fx-save">保存记录</button></div>
+</section>
+
+<!-- ========== 记录 ========== -->
+<section class="panel" id="tab-rec" hidden>
+  <div class="note-preview" id="previewNote" hidden>这是网页预览版：记录只存在当前浏览器里，换设备或清除数据就没了。正式记录请用安卓 app。</div>
+  <div class="toolbar">
+    <button class="btn small" id="rec-export">导出 Excel</button>
+    <button class="btn small" id="rec-backup">备份</button>
+    <button class="btn small" id="rec-restore">恢复备份</button>
+    <input type="file" id="rec-file" accept="application/json,.json" hidden>
+  </div>
+  <div class="chips" id="rec-filter"></div>
+  <input id="rec-q" placeholder="搜索样品编号、元素或备注">
+  <div id="rec-list" class="panel"></div>
+</section>
+
+<!-- ========== 设置 ========== -->
+<section class="panel" id="tab-set" hidden>
+  <div class="card">
+    <h3>火试金默认值</h3>
+    <div class="grid2">
+      <label class="f"><span>称样量 <em>g</em></span><input id="st-faMass" inputmode="decimal"></label>
+      <label class="f"><span>补银量 <em>mg</em></span><input id="st-faAgAdd" inputmode="decimal"></label>
+      <label class="f"><span>金空白 <em>mg</em></span><input id="st-faAuBlank" inputmode="decimal"></label>
+      <label class="f"><span>银空白 <em>mg</em></span><input id="st-faAgBlank" inputmode="decimal"></label>
+      <label class="f"><span>平行样份数</span><input id="st-faN" inputmode="numeric"></label>
+      <label class="f"><span>结果小数位</span><input id="st-dec" inputmode="numeric"></label>
+      <label class="f"><span>银金比低于此值提醒</span><input id="st-faRatio" inputmode="decimal"></label>
+    </div>
+  </div>
+  <div class="card">
+    <h3>仪器换算默认值</h3>
+    <div class="grid3">
+      <label class="f"><span>称样量 <em>g</em></span><input id="st-inMass" inputmode="decimal"></label>
+      <label class="f"><span>定容 <em>mL</em></span><input id="st-inVol" inputmode="decimal"></label>
+      <label class="f"><span>稀释倍数</span><input id="st-inDil" inputmode="decimal"></label>
+    </div>
+  </div>
+  <div class="card">
+    <h3>关于计算</h3>
+    <div class="formula" style="white-space:normal">
+      金 g/t = (金粒 mg − 金空白) × 1000 ÷ 称样 g<br>
+      银 g/t = (合粒 − 金粒 − 补银 − 银空白) mg × 1000 ÷ 称样 g<br>
+      仪器 g/t = (读数 − 空白) mg/L × 定容 mL × 稀释倍数 ÷ 称样 g<br>
+      1% = 10000 g/t
+    </div>
+  </div>
+  <button class="btn" id="st-reset">恢复默认设置</button>
+  <p class="pagehead" style="text-align:center;margin:0" id="st-count"></p>
+</section>
+
+</main>
+
+<nav class="tabs" aria-label="页面">
+  <div class="row">
+    <button data-tab="fa" class="on"><span class="ic">Au·Ag</span>火试金</button>
+    <button data-tab="inst"><span class="ic">mg/L</span>仪器</button>
+    <button data-tab="flux"><span class="ic">KNO₃</span>配料</button>
+    <button data-tab="rec"><span class="ic">≡</span>记录</button>
+    <button data-tab="set"><span class="ic">⚙</span>设置</button>
+  </div>
+</nav>
+
+<div class="sheet-bg" id="sheetBg" hidden><div class="sheet" id="sheet"></div></div>
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+var KEY = "lab_notebook_v1";
+var DEF = {faMass:20, faAgAdd:2.5, faAuBlank:0, faAgBlank:0, faN:2, dec:2, faRatio:2.5,
+  inMass:0.5, inVol:100, inDil:1,
+  fxTarget:30, fxKS:20, fxKNO3:4, fxStarch:11, fxRoast:25};
+var KINDS = ["金矿结算样","粗铅结算样","摸底样","其他"];
+var ELS = ["Au","Ag","Cu","Pb","Zn","Fe","As","Sb","Bi","S"];
+var TITLES = {fa:"火试金品位计算", inst:"ICP / AAS 结果换算", flux:"火试金配料计算", rec:"化验记录", set:"设置"};
+
+function $(id){ return document.getElementById(id); }
+var bridge = (typeof window.Android !== "undefined" && window.Android && typeof window.Android.saveData === "function") ? window.Android : null;
+
+/* ---------- 数字工具 ---------- */
+function num(v){
+  if (v === null || v === undefined) return NaN;
+  v = String(v).trim().replace(/，|,/g, ".");
+  if (v === "") return NaN;
+  return Number(v);
+}
+function ok(x){ return typeof x === "number" && isFinite(x); }
+function fmt(x, d){ return ok(x) ? x.toFixed(d) : "—"; }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]; }); }
+function pad(n){ return (n < 10 ? "0" : "") + n; }
+function today(){ var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function mean(a){ var s = 0; for (var i=0;i<a.length;i++) s += a[i]; return a.length ? s/a.length : NaN; }
+/* 两份平行：相对偏差 |a−b|/(a+b)；三份：相对极差 (max−min)/平均 */
+function relDev(vals){
+  vals = vals.filter(ok);
+  if (vals.length < 2) return {v:NaN, label:""};
+  var m = mean(vals);
+  if (!(m > 0)) return {v:NaN, label:""};
+  if (vals.length === 2) return {v: Math.abs(vals[0]-vals[1]) / (vals[0]+vals[1]) * 100, label:"相对偏差"};
+  return {v: (Math.max.apply(null, vals) - Math.min.apply(null, vals)) / m * 100, label:"相对极差"};
+}
+
+/* ---------- 计算核心（纯函数） ---------- */
+function calcFaRow(row, p){
+  var m = num(row.m), b = num(row.b), g = num(row.g);
+  var r = {au:NaN, ag:NaN, ratio:NaN};
+  if (!(m > 0)) return r;
+  if (ok(g)) r.au = (g - p.auBlank) * 1000 / m;
+  if (ok(b) && ok(g)) {
+    r.ag = (b - g - p.agAdd - p.agBlank) * 1000 / m;
+    if (g > 0) r.ratio = (b - g) / g;
+  }
+  return r;
+}
+function calcFa(d){
+  var p = {agAdd: num(d.agAdd) || 0, auBlank: num(d.auBlank) || 0, agBlank: num(d.agBlank) || 0};
+  var rows = d.rows.slice(0, d.n).map(function(row){ return calcFaRow(row, p); });
+  var au = rows.map(function(r){ return r.au; }).filter(ok);
+  var ag = rows.map(function(r){ return r.ag; }).filter(ok);
+  return {rows: rows, auMean: au.length ? mean(au) : NaN, agMean: ag.length ? mean(ag) : NaN,
+    auRd: relDev(au), agRd: relDev(ag), p: p};
+}
+function calcInst(d){
+  var c = num(d.c), c0 = num(d.c0) || 0, v = num(d.v), f = num(d.f), m = num(d.m);
+  if (!ok(f)) f = 1;
+  var k = d.unit === "μg/L" ? 0.001 : 1;
+  var r = {gt: NaN, pct: NaN};
+  if (ok(c) && v > 0 && m > 0) {
+    r.gt = (c - c0) * k * v * f / m;
+    r.pct = r.gt / 10000;
+  }
+  return r;
+}
+function calcFlux(d, s){
+  var m = num(d.m), S = num(d.S);
+  var r = {R:NaN, kno3:NaN, starch:NaN, roast:false};
+  if (!(m > 0) || !ok(S)) return r;
+  r.R = m * S / 100 * s.fxKS;
+  var diff = s.fxTarget - r.R;
+  if (diff >= 0) { r.starch = diff / s.fxStarch; r.kno3 = 0; }
+  else { r.kno3 = -diff / s.fxKNO3; r.starch = 0; }
+  r.roast = S >= s.fxRoast;
+  return r;
+}
+window.__labCalc = {calcFa: calcFa, calcInst: calcInst, calcFlux: calcFlux, relDev: relDev};
+
+/* ---------- 存储 ---------- */
+var state = {v:1, records:[], settings: Object.assign({}, DEF), drafts:{}};
+function loadAll(){
+  var raw = null;
+  try { raw = bridge ? bridge.loadData() : window.localStorage.getItem(KEY); } catch(e) {}
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch(e) { return null; }
+}
+var saveTimer = null;
+function persist(){
+  var raw = JSON.stringify(state);
+  try { if (bridge) bridge.saveData(raw); else window.localStorage.setItem(KEY, raw); } catch(e) {}
+}
+function saveSoon(){ clearTimeout(saveTimer); saveTimer = setTimeout(persist, 400); }
+
+function S(){ return state.settings; }
+function newFa(){
+  var s = S();
+  return {date: today(), sample:"", kind: KINDS[0], agAdd: String(s.faAgAdd), auBlank: String(s.faAuBlank), agBlank: String(s.faAgBlank),
+    n: Math.min(3, Math.max(1, s.faN|0 || 2)), rows: [0,1,2].map(function(){ return {m: String(s.faMass), b:"", g:""}; }), note:""};
+}
+function newInst(){
+  var s = S();
+  return {date: today(), sample:"", inst:"ICP-OES", el:"Cu", unit:"mg/L", c:"", c0:"", m:String(s.inMass), v:String(s.inVol), f:String(s.inDil), note:""};
+}
+function newFlux(){ return {sample:"", m:String(S().faMass), S:"", note:""}; }
+
+var saved = loadAll();
+if (saved) {
+  state.records = Array.isArray(saved.records) ? saved.records : [];
+  state.settings = Object.assign({}, DEF, saved.settings || {});
+  state.drafts = saved.drafts || {};
+}
+if (!state.drafts.fa) {
+  var ex = newFa(); ex.sample = "示例-01"; ex.example = true;
+  ex.rows[0] = {m:"20.0012", b:"2.812", g:"0.2013"}; ex.rows[1] = {m:"19.9987", b:"2.795", g:"0.1988"};
+  state.drafts.fa = ex;
+}
+if (!state.drafts.inst) {
+  var ei = newInst(); ei.sample = "示例-02"; ei.example = true;
+  ei.c = "12.36"; ei.c0 = "0.02"; ei.m = "0.2000"; ei.v = "100"; ei.f = "10";
+  state.drafts.inst = ei;
+}
+if (!state.drafts.flux) { var ef = newFlux(); ef.S = "8.6"; ef.example = true; state.drafts.flux = ef; }
+
+/* ---------- 表单绑定 ---------- */
+function bindInput(id, getObj, key, after){
+  var el = $(id);
+  el.addEventListener("input", function(){
+    var o = getObj(); o[key] = el.value; if (o.example) { o.example = false; }
+    if (after) after(); saveSoon();
+  });
+  return function(){ el.value = getObj()[key] == null ? "" : getObj()[key]; };
+}
+function buildChoice(id, cls, items, getObj, key, after, labelFn){
+  var box = $(id);
+  box.innerHTML = items.map(function(it){
+    return '<button type="button" class="' + cls + '" data-v="' + esc(it) + '">' + esc(labelFn ? labelFn(it) : it) + '</button>';
+  }).join("");
+  function sync(){
+    var cur = String(getObj()[key]);
+    Array.prototype.forEach.call(box.children, function(b){ b.classList.toggle("on", b.getAttribute("data-v") === cur); });
+  }
+  box.addEventListener("click", function(e){
+    var b = e.target.closest("button"); if (!b) return;
+    var v = b.getAttribute("data-v");
+    var o = getObj(); o[key] = (key === "n") ? Number(v) : v; o.example = false;
+    sync(); if (after) after(); saveSoon();
+  });
+  return sync;
+}
+
+/* ---------- 火试金 ---------- */
+var fa = function(){ return state.drafts.fa; };
+var faSync = [
+  bindInput("fa-date", fa, "date"),
+  bindInput("fa-sample", fa, "sample"),
+  bindInput("fa-agadd", fa, "agAdd", renderFaResult),
+  bindInput("fa-aublank", fa, "auBlank", renderFaResult),
+  bindInput("fa-agblank", fa, "agBlank", renderFaResult),
+  bindInput("fa-note", fa, "note"),
+  buildChoice("fa-kind", "chip", KINDS, fa, "kind"),
+  buildChoice("fa-n", "", ["1","2","3"], fa, "n", function(){ renderFaRows(); renderFaResult(); }, function(x){ return x + " 份"; })
+];
+var LETTERS = ["A","B","C"];
+function renderFaRows(){
+  var d = fa(), html = "";
+  for (var i = 0; i < d.n; i++) {
+    var r = d.rows[i];
+    html += '<div class="par"><div class="par-h"><b>平行 ' + LETTERS[i] + '</b><span class="par-r" id="fa-pr-' + i + '"></span></div>' +
+      '<div class="grid3">' +
+      '<label class="f"><span>称样量 <em>g</em></span><input id="fa-m-' + i + '" inputmode="decimal" value="' + esc(r.m) + '"></label>' +
+      '<label class="f"><span>合粒重 <em>mg</em></span><input id="fa-b-' + i + '" inputmode="decimal" value="' + esc(r.b) + '" placeholder="0.000"></label>' +
+      '<label class="f"><span>金粒重 <em>mg</em></span><input id="fa-g-' + i + '" inputmode="decimal" value="' + esc(r.g) + '" placeholder="0.000"></label>' +
+      '</div></div>';
+  }
+  $("fa-rows").innerHTML = html;
+}
+$("fa-rows").addEventListener("input", function(e){
+  var m = /^fa-([mbg])-(\d)$/.exec(e.target.id); if (!m) return;
+  var d = fa(); d.rows[Number(m[2])][m[1]] = e.target.value; d.example = false;
+  renderFaResult(); saveSoon();
+});
+function renderFaResult(){
+  var d = fa(), c = calcFa(d), dec = S().dec|0;
+  c.rows.forEach(function(r, i){
+    var el = $("fa-pr-" + i); if (!el) return;
+    el.textContent = ok(r.au) ? ("Au " + fmt(r.au, dec) + (ok(r.ag) ? "  Ag " + fmt(r.ag, dec) : "")) : "";
+  });
+  var auSub = ok(c.auRd.v) ? c.auRd.label + " " + fmt(c.auRd.v, 2) + "%" : (c.rows.length > 1 ? "等待平行数据" : "单份");
+  var agSub = ok(c.agRd.v) ? c.agRd.label + " " + fmt(c.agRd.v, 2) + "%" : (c.rows.length > 1 ? "等待平行数据" : "单份");
+  var html = (d.example ? '<div class="example">示例数据，点「清空」开始记录</div>' : "") +
+    '<div class="big">' +
+    '<div class="val au"><span class="sym">Au</span><span class="n">' + fmt(c.auMean, dec) + '</span><span class="u">g/t</span><span class="sub">' + auSub + '</span></div>' +
+    '<div class="val ag"><span class="sym">Ag</span><span class="n">' + fmt(c.agMean, dec) + '</span><span class="u">g/t</span><span class="sub">' + agSub + '</span></div>' +
+    '</div>';
+  var lim = num(S().faRatio), low = [], neg = [];
+  c.rows.forEach(function(r, i){
+    if (ok(r.ratio) && ok(lim) && r.ratio < lim) low.push(LETTERS[i] + "（" + fmt(r.ratio, 1) + "）");
+    if (ok(r.ag) && r.ag < 0) neg.push(LETTERS[i]);
+  });
+  if (low.length) html += '<div class="hint">合粒银金比偏低：' + low.join("、") + '，分金可能溶不完，必要时重新称样加银。</div>';
+  if (neg.length) html += '<div class="hint">平行 ' + neg.join("、") + ' 的银为负值，检查补银量和合粒、金粒重量是否填对。</div>';
+  var ratios = c.rows.map(function(r){ return r.ratio; }).filter(ok);
+  if (ratios.length && !low.length) html += '<div class="hint okk">合粒银金比 ' + ratios.map(function(x){ return fmt(x,1); }).join(" / ") + '（含补银）</div>';
+  $("fa-result").innerHTML = html;
+}
+function syncFa(){ faSync.forEach(function(f){ f(); }); renderFaRows(); renderFaResult(); }
+
+$("fa-clear").addEventListener("click", function(){
+  var old = fa(), d = newFa();
+  if (!old.example) { d.date = old.date; d.kind = old.kind; d.n = old.n; }
+  state.drafts.fa = d; syncFa(); saveSoon();
+});
+$("fa-save").addEventListener("click", function(){
+  var d = fa(), c = calcFa(d);
+  if (d.example) { toast("这是示例数据，先点「清空」再填自己的数据"); return; }
+  if (!String(d.sample).trim()) { toast("请先填样品编号"); $("fa-sample").focus(); return; }
+  if (!ok(c.auMean)) { toast("至少填一份称样量和金粒重"); return; }
+  state.records.unshift({id: uid(), type:"fa", date: d.date || today(), sample: d.sample.trim(), kind: d.kind,
+    inputs: {agAdd: d.agAdd, auBlank: d.auBlank, agBlank: d.agBlank, rows: d.rows.slice(0, d.n).map(function(r){ return {m:r.m, b:r.b, g:r.g}; })},
+    result: {rows: c.rows, auMean: c.auMean, agMean: c.agMean, auRd: c.auRd.v, agRd: c.agRd.v, rdLabel: c.auRd.label},
+    dec: S().dec|0, note: d.note, created: Date.now()});
+  var nd = newFa(); nd.date = d.date; nd.kind = d.kind; nd.n = d.n; nd.agAdd = d.agAdd; nd.auBlank = d.auBlank; nd.agBlank = d.agBlank;
+  state.drafts.fa = nd; persist(); syncFa(); renderRecords();
+  toast("已保存 " + d.sample.trim());
+});
+
+/* ---------- 仪器 ---------- */
+var ins = function(){ return state.drafts.inst; };
+var inSync = [
+  bindInput("in-date", ins, "date"),
+  bindInput("in-sample", ins, "sample"),
+  bindInput("in-c", ins, "c", renderInst),
+  bindInput("in-c0", ins, "c0", renderInst),
+  bindInput("in-m", ins, "m", renderInst),
+  bindInput("in-v", ins, "v", renderInst),
+  bindInput("in-f", ins, "f", renderInst),
+  bindInput("in-note", ins, "note"),
+  buildChoice("in-inst", "", ["ICP-OES","AAS"], ins, "inst"),
+  buildChoice("in-unit", "", ["mg/L","μg/L"], ins, "unit", renderInst, function(x){ return x === "mg/L" ? "mg/L（μg/mL）" : "μg/L"; }),
+  buildChoice("in-el", "chip", ELS, ins, "el", function(){ $("in-elx").value = ""; renderInst(); })
+];
+$("in-elx").addEventListener("input", function(){
+  var v = $("in-elx").value.trim(); var d = ins(); d.el = v || "Cu"; d.example = false;
+  inSync[inSync.length-1](); renderInst(); saveSoon();
+});
+function renderInst(){
+  var d = ins(), r = calcInst(d), dec = S().dec|0;
+  var pctDec = Math.max(dec, 2) + 1;
+  var c0 = num(d.c0) || 0, f = ok(num(d.f)) ? num(d.f) : 1;
+  var unitNote = d.unit === "μg/L" ? " ÷ 1000" : "";
+  var html = (d.example ? '<div class="example">示例数据，点「清空」开始记录</div>' : "") +
+    '<div class="big">' +
+    '<div class="val neutral"><span class="sym">' + esc(d.el) + '</span><span class="n">' + fmt(r.gt, dec) + '</span><span class="u">g/t（mg/kg）</span></div>' +
+    '<div class="val neutral"><span class="sym">' + esc(d.el) + '</span><span class="n">' + fmt(r.pct, pctDec) + '</span><span class="u">%</span></div>' +
+    '</div>' +
+    '<div class="formula">(' + esc(d.c || "C") + ' − ' + esc(String(c0)) + ')' + unitNote + ' × ' + esc(d.v || "V") + ' × ' + esc(String(f)) + ' ÷ ' + esc(d.m || "m") + ' = ' + fmt(r.gt, dec) + ' g/t</div>';
+  if (ok(r.gt) && r.gt < 0) html += '<div class="hint">结果为负，样品读数低于空白，检查空白或检出限。</div>';
+  $("in-result").innerHTML = html;
+}
+function syncInst(){
+  inSync.forEach(function(f){ f(); });
+  $("in-elx").value = ELS.indexOf(ins().el) < 0 ? ins().el : "";
+  renderInst();
+}
+$("in-clear").addEventListener("click", function(){
+  var old = ins(), d = newInst();
+  if (!old.example) { d.date = old.date; d.inst = old.inst; d.el = old.el; d.unit = old.unit; d.m = old.m; d.v = old.v; d.f = old.f; }
+  state.drafts.inst = d; syncInst(); saveSoon();
+});
+$("in-save").addEventListener("click", function(){
+  var d = ins(), r = calcInst(d);
+  if (d.example) { toast("这是示例数据，先点「清空」再填自己的数据"); return; }
+  if (!String(d.sample).trim()) { toast("请先填样品编号"); $("in-sample").focus(); return; }
+  if (!ok(r.gt)) { toast("读数、称样量、定容体积要填全"); return; }
+  state.records.unshift({id: uid(), type:"inst", date: d.date || today(), sample: d.sample.trim(), el: d.el, inst: d.inst,
+    inputs: {c:d.c, c0:d.c0, unit:d.unit, m:d.m, v:d.v, f:d.f}, result: r, dec: S().dec|0, note: d.note, created: Date.now()});
+  var nd = newInst(); ["date","inst","el","unit","m","v","f"].forEach(function(k){ nd[k] = d[k]; });
+  state.drafts.inst = nd; persist(); syncInst(); renderRecords();
+  toast("已保存 " + d.sample.trim());
+});
+
+/* ---------- 配料 ---------- */
+var fx = function(){ return state.drafts.flux; };
+var setObj = function(){ return state.settings; };
+var fxSync = [
+  bindInput("fx-sample", fx, "sample"),
+  bindInput("fx-m", fx, "m", renderFlux),
+  bindInput("fx-s", fx, "S", renderFlux),
+  bindInput("fx-note", fx, "note")
+];
+[["fx-target","fxTarget"],["fx-ks","fxKS"],["fx-kno3","fxKNO3"],["fx-kst","fxStarch"],["fx-roast","fxRoast"]].forEach(function(p){
+  var el = $(p[0]);
+  el.addEventListener("input", function(){ var v = num(el.value); if (ok(v) && v > 0) { state.settings[p[1]] = v; renderFlux(); saveSoon(); } });
+  fxSync.push(function(){ el.value = state.settings[p[1]]; });
+});
+function renderFlux(){
+  var d = fx(), s = S(), r = calcFlux(d, s);
+  var html = (d.example ? '<div class="example">示例数据，点「清空」开始</div>' : "");
+  if (r.roast) html += '<div class="hint">硫 ' + esc(d.S) + '% 已超过 ' + s.fxRoast + '%，按你的做法先焙烧再配料，下面的数只作参考。</div>';
+  html += '<div class="big">' +
+    '<div class="val neutral"><span class="sym">KNO₃ 硝酸钾</span><span class="n">' + fmt(r.kno3, 2) + '</span><span class="u">g</span></div>' +
+    '<div class="val neutral"><span class="sym">淀粉</span><span class="n">' + fmt(r.starch, 2) + '</span><span class="u">g</span></div>' +
+    '</div>';
+  if (ok(r.R)) {
+    html += '<div class="formula">样品还原铅 ≈ ' + esc(d.m) + ' × ' + esc(d.S) + '% × ' + s.fxKS + ' = ' + fmt(r.R, 2) + ' g（目标铅扣 ' + s.fxTarget + ' g）</div>';
+    html += '<div class="hint okk">' + (r.kno3 > 0 ? "还原力超出目标 " + fmt(r.R - s.fxTarget, 2) + " g 铅，加硝酸钾氧化掉。" : "还原力不足 " + fmt(s.fxTarget - r.R, 2) + " g 铅，加淀粉补足。") + '</div>';
+  }
+  $("fx-result").innerHTML = html;
+}
+function syncFlux(){ fxSync.forEach(function(f){ f(); }); renderFlux(); }
+$("fx-clear").addEventListener("click", function(){
+  var old = fx(), d = newFlux(); if (!old.example) d.m = old.m;
+  state.drafts.flux = d; syncFlux(); saveSoon();
+});
+$("fx-save").addEventListener("click", function(){
+  var d = fx(), s = S(), r = calcFlux(d, s);
+  if (d.example) { toast("这是示例数据，先点「清空」再填自己的数据"); return; }
+  if (!ok(r.R)) { toast("称样量和硫含量要填全"); return; }
+  state.records.unshift({id: uid(), type:"flux", date: today(), sample: (d.sample || "").trim(),
+    inputs: {m:d.m, S:d.S, target:s.fxTarget, kS:s.fxKS, kKNO3:s.fxKNO3, kStarch:s.fxStarch}, result: r, note: d.note, created: Date.now()});
+  var nd = newFlux(); nd.m = d.m; state.drafts.flux = nd; persist(); syncFlux(); renderRecords();
+  toast("已保存配料记录");
+});
+
+/* ---------- 记录 ---------- */
+var recFilter = "all", openId = null, armedId = null;
+var TYPE_NAME = {fa:"火试金", inst:"仪器", flux:"配料"};
+buildChoice("rec-filter", "chip", ["all","fa","inst","flux"], function(){ return {f: recFilter}; }, "f", null,
+  function(x){ return x === "all" ? "全部" : TYPE_NAME[x]; });
+$("rec-filter").addEventListener("click", function(e){
+  var b = e.target.closest("button"); if (!b) return;
+  recFilter = b.getAttribute("data-v");
+  Array.prototype.forEach.call($("rec-filter").children, function(x){ x.classList.toggle("on", x === b); });
+  renderRecords();
+});
+$("rec-filter").children[0].classList.add("on");
+$("rec-q").addEventListener("input", renderRecords);
+
+function filtered(){
+  var q = $("rec-q").value.trim().toLowerCase();
+  return state.records.filter(function(r){
+    if (recFilter !== "all" && r.type !== recFilter) return false;
+    if (!q) return true;
+    return [r.sample, r.el, r.kind, r.note].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
+}
+function detailText(r){
+  var i = r.inputs || {}, d = r.dec == null ? 2 : r.dec, L = [];
+  if (r.type === "fa") {
+    L.push("类型 " + (r.kind || "") + "  补银 " + (i.agAdd || 0) + " mg  空白 Au " + (i.auBlank || 0) + " / Ag " + (i.agBlank || 0) + " mg");
+    (i.rows || []).forEach(function(x, k){
+      var rr = (r.result.rows || [])[k] || {};
+      L.push(LETTERS[k] + "：称样 " + x.m + " g  合粒 " + (x.b || "—") + " mg  金粒 " + (x.g || "—") + " mg  →  Au " + fmt(rr.au, d) + "  Ag " + fmt(rr.ag, d));
+    });
+    if (ok(r.result.auRd)) L.push("Au " + (r.result.rdLabel || "相对偏差") + " " + fmt(r.result.auRd, 2) + "%" + (ok(r.result.agRd) ? "  Ag " + fmt(r.result.agRd, 2) + "%" : ""));
+  } else if (r.type === "inst") {
+    L.push((r.inst || "") + "  读数 " + i.c + " " + i.unit + "  空白 " + (i.c0 || 0));
+    L.push("称样 " + i.m + " g  定容 " + i.v + " mL  稀释 " + (i.f || 1) + " 倍");
+  } else if (r.type === "flux") {
+    L.push("称样 " + i.m + " g  硫 " + i.S + "%  目标铅扣 " + i.target + " g");
+    L.push("系数：硫 " + i.kS + "  硝酸钾 " + i.kKNO3 + "  淀粉 " + i.kStarch);
+    L.push("样品还原铅 " + fmt(r.result.R, 2) + " g");
+  }
+  if (r.note) L.push("备注：" + r.note);
+  return L.join("\n");
+}
+function mainLine(r){
+  var d = r.dec == null ? 2 : r.dec;
+  if (r.type === "fa") return '<span class="au">Au ' + fmt(r.result.auMean, d) + '</span><span class="ag">Ag ' + fmt(r.result.agMean, d) + '</span><span>g/t</span>';
+  if (r.type === "inst") return '<span>' + esc(r.el) + ' ' + fmt(r.result.gt, d) + ' g/t</span><span>' + fmt(r.result.pct, Math.max(d,2)+1) + ' %</span>';
+  return '<span>硝酸钾 ' + fmt(r.result.kno3, 2) + ' g</span><span>淀粉 ' + fmt(r.result.starch, 2) + ' g</span>';
+}
+function renderRecords(){
+  var list = filtered(), html = "", lastDay = null;
+  if (!state.records.length) html = '<div class="empty">还没有记录。<br>在「火试金」「仪器」「配料」页算好后点「保存记录」，就会出现在这里。</div>';
+  else if (!list.length) html = '<div class="empty">没有符合条件的记录</div>';
+  list.forEach(function(r){
+    if (r.date !== lastDay) { html += '<div class="daysep">' + esc(r.date) + '</div>'; lastDay = r.date; }
+    var open = openId === r.id;
+    html += '<div class="rec" data-id="' + r.id + '">' +
+      '<div class="rec-h"><span class="pill ' + r.type + '">' + TYPE_NAME[r.type] + '</span><span class="s">' + esc(r.sample || "（未填编号）") + '</span>' +
+      (r.type === "fa" && r.kind ? '<span class="d">' + esc(r.kind) + '</span>' : "") + '</div>' +
+      '<div class="rec-v">' + mainLine(r) + '</div>' +
+      (open ? '<div class="rec-detail">' + esc(detailText(r)) + '</div><div class="rec-act"><button class="btn small danger' + (armedId === r.id ? " armed" : "") + '" data-del="' + r.id + '">' + (armedId === r.id ? "确认删除" : "删除") + '</button></div>' : "") +
+      '</div>';
+  });
+  $("rec-list").innerHTML = html;
+  $("st-count").textContent = "共 " + state.records.length + " 条记录";
+}
+$("rec-list").addEventListener("click", function(e){
+  var del = e.target.closest("[data-del]");
+  if (del) {
+    var id = del.getAttribute("data-del");
+    if (armedId === id) {
+      state.records = state.records.filter(function(r){ return r.id !== id; });
+      armedId = null; openId = null; persist(); renderRecords(); toast("已删除");
+    } else { armedId = id; renderRecords(); }
+    return;
+  }
+  var card = e.target.closest(".rec"); if (!card) return;
+  var cid = card.getAttribute("data-id");
+  openId = openId === cid ? null : cid; armedId = null; renderRecords();
+});
+
+/* ---------- 导出 / 备份 ---------- */
+function csvCell(v){ v = v == null ? "" : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function buildCsv(list){
+  var head = ["日期","类型","样品编号","样品类型/元素","Au(g/t)","Ag(g/t)","结果","单位","偏差(%)","明细","备注"];
+  var rows = [head];
+  list.slice().reverse().forEach(function(r){
+    var d = r.dec == null ? 2 : r.dec, i = r.inputs || {};
+    if (r.type === "fa") {
+      var det = (i.rows || []).map(function(x, k){
+        var rr = (r.result.rows || [])[k] || {};
+        return LETTERS[k] + ":称样" + x.m + "g 合粒" + (x.b || "") + "mg 金粒" + (x.g || "") + "mg Au" + fmt(rr.au, d) + " Ag" + fmt(rr.ag, d);
+      }).join("; ") + "; 补银" + (i.agAdd || 0) + "mg";
+      var dev = ok(r.result.auRd) ? "Au " + fmt(r.result.auRd, 2) + (ok(r.result.agRd) ? " / Ag " + fmt(r.result.agRd, 2) : "") : "";
+      rows.push([r.date, "火试金", r.sample, r.kind, fmt(r.result.auMean, d), fmt(r.result.agMean, d), "", "", dev, det, r.note]);
+    } else if (r.type === "inst") {
+      rows.push([r.date, (r.inst || "仪器"), r.sample, r.el, r.el === "Au" ? fmt(r.result.gt, d) : "", r.el === "Ag" ? fmt(r.result.gt, d) : "",
+        fmt(r.result.gt, d), "g/t", "", "读数" + i.c + i.unit + " 空白" + (i.c0 || 0) + " 称样" + i.m + "g 定容" + i.v + "mL 稀释" + (i.f || 1) + " 合" + fmt(r.result.pct, Math.max(d,2)+1) + "%", r.note]);
+    } else {
+      rows.push([r.date, "配料", r.sample, "", "", "", "硝酸钾" + fmt(r.result.kno3, 2) + "g 淀粉" + fmt(r.result.starch, 2) + "g", "",
+        "", "称样" + i.m + "g 硫" + i.S + "% 目标铅扣" + i.target + "g", r.note]);
+    }
+  });
+  return "﻿" + rows.map(function(r){ return r.map(csvCell).join(","); }).join("\r\n");
+}
+function stamp(){ var d = new Date(); return d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes()); }
+
+function openSheet(html){ $("sheet").innerHTML = html; $("sheetBg").hidden = false; }
+function closeSheet(){ $("sheetBg").hidden = true; }
+$("sheetBg").addEventListener("click", function(e){ if (e.target === $("sheetBg")) closeSheet(); });
+
+function offerFile(name, mime, content, title, desc){
+  if (bridge && typeof bridge.saveFile === "function") {
+    openSheet('<h3>' + esc(title) + '</h3><p>' + esc(desc) + '</p>' +
+      '<button class="btn primary" id="sh-save">保存到手机「下载」文件夹</button>' +
+      '<button class="btn" id="sh-share">发送到微信 / 其他应用</button>' +
+      '<button class="btn" id="sh-close">取消</button>');
+    $("sh-save").onclick = function(){ var m = bridge.saveFile(name, mime, content); closeSheet(); toast(m || "已保存"); };
+    $("sh-share").onclick = function(){ closeSheet(); bridge.shareFile(name, mime, content); };
+  } else {
+    openSheet('<h3>' + esc(title) + '</h3><p>网页预览版不能直接下载文件。复制下面的内容，粘贴到记事本另存为 ' + esc(name) + '。</p>' +
+      '<textarea id="sh-text" readonly></textarea>' +
+      '<button class="btn primary" id="sh-copy">复制全部</button><button class="btn" id="sh-close">关闭</button>');
+    $("sh-text").value = content.replace(/^﻿/, "");
+    $("sh-copy").onclick = function(){
+      var t = $("sh-text");
+      try { navigator.clipboard.writeText(t.value).then(function(){ toast("已复制"); }, function(){ t.select(); toast("请长按选择后复制"); }); }
+      catch(e) { t.select(); toast("请长按选择后复制"); }
+    };
+  }
+  $("sh-close").onclick = closeSheet;
+}
+$("rec-export").addEventListener("click", function(){
+  var list = filtered();
+  if (!list.length) { toast("没有可导出的记录"); return; }
+  offerFile("化验记录-" + stamp() + ".csv", "text/csv", buildCsv(list), "导出 Excel",
+    "共 " + list.length + " 条（按当前筛选），CSV 格式，Excel 和 WPS 都能直接打开。");
+});
+$("rec-backup").addEventListener("click", function(){
+  var data = JSON.stringify({app:"lab-notebook", v:1, exported: new Date().toISOString(), records: state.records, settings: state.settings});
+  offerFile("化验手帐备份-" + stamp() + ".json", "application/json", data, "备份全部数据",
+    "包含 " + state.records.length + " 条记录和设置。换手机或重装 app 时，用「恢复备份」导回来。");
+});
+$("rec-restore").addEventListener("click", function(){ $("rec-file").value = ""; $("rec-file").click(); });
+$("rec-file").addEventListener("change", function(){
+  var file = $("rec-file").files && $("rec-file").files[0]; if (!file) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var data; try { data = JSON.parse(String(fr.result).replace(/^﻿/, "")); } catch(e) { toast("这个文件不是有效的备份"); return; }
+    if (!data || !Array.isArray(data.records)) { toast("这个文件不是化验手帐的备份"); return; }
+    var have = {}; state.records.forEach(function(r){ have[r.id] = true; });
+    var add = data.records.filter(function(r){ return r && r.id && !have[r.id]; });
+    state.records = state.records.concat(add).sort(function(a, b){ return (b.date || "").localeCompare(a.date || "") || (b.created || 0) - (a.created || 0); });
+    persist(); renderRecords(); toast("已导入 " + add.length + " 条新记录");
+  };
+  fr.readAsText(file, "utf-8");
+});
+
+/* ---------- 设置 ---------- */
+var stKeys = ["faMass","faAgAdd","faAuBlank","faAgBlank","faN","dec","faRatio","inMass","inVol","inDil"];
+stKeys.forEach(function(k){
+  var el = $("st-" + k);
+  el.addEventListener("input", function(){
+    var v = num(el.value); if (!ok(v) || v < 0) return;
+    if (k === "faN") v = Math.min(3, Math.max(1, Math.round(v)));
+    if (k === "dec") v = Math.min(5, Math.max(0, Math.round(v)));
+    state.settings[k] = v; renderFaResult(); renderInst(); renderRecords(); saveSoon();
+  });
+});
+function syncSettings(){ stKeys.forEach(function(k){ $("st-" + k).value = state.settings[k]; }); }
+var resetArmed = false;
+$("st-reset").addEventListener("click", function(){
+  if (!resetArmed) { resetArmed = true; $("st-reset").textContent = "再点一次确认恢复默认"; $("st-reset").classList.add("danger"); return; }
+  resetArmed = false; $("st-reset").textContent = "恢复默认设置"; $("st-reset").classList.remove("danger");
+  state.settings = Object.assign({}, DEF); persist(); syncSettings(); syncFlux(); renderFaResult(); renderInst(); toast("已恢复默认设置（记录不受影响）");
+});
+
+/* ---------- 导航 ---------- */
+var curTab = "fa";
+function go(tab){
+  curTab = tab;
+  ["fa","inst","flux","rec","set"].forEach(function(t){ $("tab-" + t).hidden = t !== tab; });
+  Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function(b){ b.classList.toggle("on", b.getAttribute("data-tab") === tab); });
+  $("pageTitle").textContent = TITLES[tab];
+  if (tab === "rec") renderRecords();
+  window.scrollTo(0, 0);
+}
+document.querySelector(".tabs").addEventListener("click", function(e){ var b = e.target.closest("button"); if (b) go(b.getAttribute("data-tab")); });
+window.__back = function(){
+  if (!$("sheetBg").hidden) { closeSheet(); return true; }
+  if (curTab !== "fa") { go("fa"); return true; }
+  return false;
+};
+
+var toastTimer = null;
+function toast(msg){
+  var t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.hidden = true; }, 2200);
+}
+document.addEventListener("visibilitychange", function(){ if (document.hidden) persist(); });
+
+if (!bridge) $("previewNote").hidden = false;
+syncFa(); syncInst(); syncFlux(); syncSettings(); renderRecords();
+})();
+</script>
+
+</body>
+</html>
