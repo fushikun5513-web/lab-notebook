@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +20,15 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk lab-notebook.apk
       - uses: actions/upload-artifact@v4
         with:
           name: 化验手帐-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: lab-notebook.apk
+      - name: 发布到 Releases（手机可直接下载）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.0.${{ github.run_number }}" lab-notebook.apk \
+            --title "化验手帐 v1.0.${{ github.run_number }}" \
+            --notes "下载 lab-notebook.apk，在手机上点开安装。需要安卓 10 或以上。"
